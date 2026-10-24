@@ -18,10 +18,10 @@ Python · Flask · Google Gemini · ShazamIO · YouTube Music API · NumPy · Sc
 
 ## Run locally
 
-Requires Python 3.10+ and [FFmpeg](https://ffmpeg.org/) installed and available on your PATH.
+Recommended: **Python 3.10–3.11**, with [FFmpeg](https://ffmpeg.org/) installed and available on your PATH.
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
