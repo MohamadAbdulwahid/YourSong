@@ -1,0 +1,751 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+<style>
+    .waveform-container {
+        width: 100%;
+        height: 150px;
+        margin: 20px 0;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .time-display {
+        font-family: monospace;
+        font-size: 16px;
+    }
+    
+    .time-range {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+    
+    .slider-container {
+        margin: 30px 0;
+        padding: 0 10px;
+        position: relative;
+    }
+    
+    .track-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .track-image {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-right: 20px;
+    }
+    
+    .track-details h3 {
+        margin-bottom: 5px;
+    }
+    
+    .track-details p {
+        margin-bottom: 3px;
+        color: #6c757d;
+    }
+    
+    #time-slider {
+        height: 15px;
+    }
+    
+    .noUi-connect {
+        background: #0d6efd;
+    }
+    
+    .noUi-handle {
+        border-radius: 50%;
+        background-color: white;
+        box-shadow: 0 0 0 2px #0d6efd;
+    }
+    
+    .noUi-handle:before, .noUi-handle:after {
+        display: none;
+    }
+    
+    .preview-controls {
+        text-align: center;
+        margin: 20px 0;
+    }
+    
+    .preview-controls button {
+        margin: 0 5px;
+    }
+    
+    .section-limits {
+        margin-top: 30px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    /* New styles for enhanced visualization */
+    .selection-highlight {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        background-color: rgba(13, 110, 253, 0.2);
+        border-left: 2px solid #0d6efd;
+        border-right: 2px solid #0d6efd;
+        z-index: 1;
+        pointer-events: none;
+    }
+    
+    .selection-marker {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background-color: #0d6efd;
+        z-index: 2;
+    }
+    
+    .selection-marker.start {
+        border-left: 1px solid white;
+    }
+    
+    .selection-marker.end {
+        border-right: 1px solid white;
+    }
+    
+    .cursor-position {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background-color: #dc3545;
+        z-index: 3;
+    }
+    
+    .time-label {
+        position: absolute;
+        bottom: 5px;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 10px;
+        z-index: 4;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Select Favorite Part</li>
+            </ol>
+        </nav>
+        <h2 class="mb-4">Select Your Favorite Part</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-body">
+                {% if song_info %}
+                <div class="track-info">
+                    {% if song_info.cover_art %}
+                    <img src="{{ song_info.cover_art }}" class="track-image" alt="{{ song_info.title }}">
+                    {% else %}
+                    <div class="track-image bg-secondary d-flex align-items-center justify-content-center">
+                        <i class="fas fa-music text-white fa-2x"></i>
+                    </div>
+                    {% endif %}
+                    <div class="track-details">
+                        <h3>{{ song_info.title }}</h3>
+                        <p>{{ song_info.artist }}</p>
+                        <p>{{ song_info.album }}</p>
+                    </div>
+                </div>
+                {% elif ytmusic_link %}
+                <div id="track-info-container" class="track-info">
+                    <div class="track-image bg-secondary d-flex align-items-center justify-content-center">
+                        <i class="fas fa-music text-white fa-2x"></i>
+                    </div>
+                    <div class="track-details">
+                        <h3>Loading track information...</h3>
+                        <p>Please wait while we load track details</p>
+                    </div>
+                </div>
+                <input type="hidden" id="ytmusic-link" value="{{ ytmusic_link }}">
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    No song information available. Please go back and upload a song or provide a link.
+                </div>
+                {% endif %}
+
+                <div class="waveform-container" id="waveform-container">
+                    <div id="waveform"></div>
+                    <div class="selection-highlight" id="selection-highlight"></div>
+                    <div class="selection-marker start" id="selection-start-marker"></div>
+                    <div class="selection-marker end" id="selection-end-marker"></div>
+                    <div class="cursor-position" id="cursor-position"></div>
+                    <div class="time-label" id="start-label"></div>
+                    <div class="time-label" id="end-label"></div>
+                    <div class="time-label" id="cursor-label"></div>
+                </div>
+
+                {% if audio_file %}
+                <!-- Hidden audio element to ensure browser can load the file -->
+                <audio id="audio-source" preload="auto" style="display:none">
+                    <source src="{{ url_for('uploaded_file', filename=audio_file) }}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                {% endif %}
+
+                <div class="slider-container">
+                    <div id="time-slider"></div>
+                    <div class="time-range mt-2">
+                        <span id="start-time" class="time-display">00:00</span>
+                        <span id="end-time" class="time-display">00:00</span>
+                    </div>
+                </div>
+
+                <div class="preview-controls">
+                    <button id="play-selection" class="btn btn-primary">
+                        <i class="fas fa-play me-2"></i>Play Selection
+                    </button>
+                    <button id="pause-playback" class="btn btn-outline-secondary">
+                        <i class="fas fa-pause me-2"></i>Pause
+                    </button>
+                    <button id="replay-selection" class="btn btn-outline-primary">
+                        <i class="fas fa-redo me-2"></i>Replay
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-limits card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Selection Guidelines</h5>
+                <p>For best results, please select a segment that:</p>
+                <ul>
+                    <li>Is between 5-30 seconds long</li>
+                    <li>Contains a distinct musical pattern you enjoy</li>
+                    <li>Doesn't contain abrupt changes or transitions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h4 class="card-title">Your Selection</h4>
+                
+                <div class="mb-3">
+                    <label class="form-label">Selected Duration</label>
+                    <div id="selection-duration" class="form-control bg-light">00:00</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Start Time</label>
+                    <div id="selection-start" class="form-control bg-light">00:00</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">End Time</label>
+                    <div id="selection-end" class="form-control bg-light">00:00</div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button id="continue-btn" class="btn btn-success">
+                        <i class="fas fa-magic me-2"></i>Create Your Track
+                    </button>
+                    <button id="reset-btn" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo me-2"></i>Reset Selection
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">How It Works</h5>
+                <p>After selecting your favorite part:</p>
+                <ol>
+                    <li>We'll analyze the musical characteristics of your selection</li>
+                    <li>Find similar segments in related songs</li>
+                    <li>Create a seamless custom track just for you!</li>
+                </ol>
+                <div class="progress mt-3 d-none" id="progress-container">
+                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.3/wavesurfer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+<script>
+    $(document).ready(function() {
+        let wavesurfer;
+        let audioLoaded = false;
+        let audioSource = '';
+        let audioDuration = 0;
+        let isPlaying = false;
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        let currentCursorPosition = 0;
+        
+        // Time formatting function
+        function formatTime(seconds) {
+            if (isNaN(seconds)) seconds = 0;
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Initialize WaveSurfer
+        function initWaveSurfer() {
+            console.log('Initializing WaveSurfer...');
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#6c757d',
+                progressColor: '#0d6efd',
+                cursorColor: '#dc3545',
+                barWidth: 2,
+                barGap: 1,
+                height: 150,
+                responsive: true,
+                normalize: true,        // Normalize the waveform
+                fillParent: true,       // Fill the entire container
+                scrollParent: false,    // No horizontal scrolling
+                backend: 'MediaElement', // Using MediaElement for better compatibility
+                hideScrollbar: true,
+                minPxPerSec: 50,        // More detailed waveform
+                pixelRatio: 1           // Consistent rendering across devices
+            });
+            
+            // Events
+            wavesurfer.on('ready', function() {
+                console.log('WaveSurfer is ready');
+                audioLoaded = true;
+                audioDuration = wavesurfer.getDuration();
+                $('#end-time').text(formatTime(audioDuration));
+                
+                // Initialize time slider
+                initTimeSlider();
+                
+                // Enable buttons
+                $('#play-selection').prop('disabled', false);
+                $('#pause-playback').prop('disabled', false);
+                $('#replay-selection').prop('disabled', false);
+                $('#continue-btn').prop('disabled', false);
+                $('#reset-btn').prop('disabled', false);
+                
+                // Set initial selection to full track
+                updateSelectionVisuals(0, audioDuration);
+            });
+            
+            wavesurfer.on('error', function(err) {
+                console.error('WaveSurfer error:', err);
+                alert('Error loading audio. Please try again or use a different file/link.');
+            });
+            
+            // Track cursor position
+            wavesurfer.on('audioprocess', function() {
+                updateCursorPosition(wavesurfer.getCurrentTime());
+            });
+            
+            // When audio finishes
+            wavesurfer.on('finish', function() {
+                isPlaying = false;
+                updatePlayPauseButtons();
+            });
+            
+            // Click on waveform to set cursor position
+            wavesurfer.drawer.on('click', function(e, position) {
+                const relativeX = position.clientX - this.container.getBoundingClientRect().left;
+                const percent = relativeX / this.container.clientWidth;
+                const seconds = percent * audioDuration;
+                
+                // Only allow cursor within the selected region
+                if (seconds >= selectionStart && seconds <= selectionEnd) {
+                    wavesurfer.seekTo(percent);
+                    updateCursorPosition(seconds);
+                } else {
+                    // If outside selection, move to nearest boundary
+                    if (seconds < selectionStart) {
+                        wavesurfer.seekTo(selectionStart / audioDuration);
+                        updateCursorPosition(selectionStart);
+                    } else {
+                        wavesurfer.seekTo(selectionEnd / audioDuration);
+                        updateCursorPosition(selectionEnd);
+                    }
+                }
+            });
+            
+            // Load audio if available
+            loadAudio();
+        }
+        
+        // Load audio from either uploaded file or YouTube Music link
+        function loadAudio() {
+            console.log('Loading audio...');
+            
+            // Check for uploaded audio file
+            const audioElement = document.getElementById('audio-source');
+            if (audioElement) {
+                console.log('Loading uploaded audio file');
+                audioSource = audioElement.querySelector('source').src;
+                wavesurfer.load(audioSource);
+                return;
+            }
+            
+            // Check for YouTube Music link
+            const ytmusicLink = $('#ytmusic-link').val();
+            if (ytmusicLink) {
+                loadYouTubeMusicAudio();
+            } else {
+                console.error('No audio source found');
+                alert('No audio source found. Please go back and upload a file or provide a link.');
+            }
+        }
+        
+        // Initialize the noUiSlider for time selection
+        function initTimeSlider() {
+            const slider = document.getElementById('time-slider');
+            
+            if (slider.noUiSlider) {
+                slider.noUiSlider.destroy();
+            }
+            
+            noUiSlider.create(slider, {
+                start: [0, audioDuration],
+                connect: true,
+                range: {
+                    'min': 0,
+                    'max': audioDuration
+                },
+                step: 0.1,
+                behaviour: 'drag',
+                tooltips: [
+                    {
+                        to: function(value) {
+                            return formatTime(value);
+                        }
+                    },
+                    {
+                        to: function(value) {
+                            return formatTime(value);
+                        }
+                    }
+                ]
+            });
+            
+            // Update displays when slider is adjusted
+            slider.noUiSlider.on('update', function(values, handle) {
+                const startTime = parseFloat(values[0]);
+                const endTime = parseFloat(values[1]);
+                
+                // Update time displays
+                $('#start-time').text(formatTime(startTime));
+                $('#end-time').text(formatTime(endTime));
+                
+                // Update selection info in sidebar
+                $('#selection-start').text(formatTime(startTime));
+                $('#selection-end').text(formatTime(endTime));
+                $('#selection-duration').text(formatTime(endTime - startTime));
+                
+                // Update selection visualization
+                updateSelectionVisuals(startTime, endTime);
+                
+                // Validate selection
+                validateSelection(endTime - startTime);
+                
+                // Store selection times
+                selectionStart = startTime;
+                selectionEnd = endTime;
+                
+                // If cursor is outside new selection, move it inside
+                if (currentCursorPosition < startTime || currentCursorPosition > endTime) {
+                    // Move to start of selection
+                    currentCursorPosition = startTime;
+                    if (isPlaying) {
+                        wavesurfer.seekTo(startTime / audioDuration);
+                    } else {
+                        updateCursorPosition(startTime);
+                    }
+                }
+            });
+        }
+        
+        // Update the visual representation of the selection
+        function updateSelectionVisuals(startTime, endTime) {
+            if (!audioLoaded || !audioDuration) return;
+            
+            const containerWidth = $('#waveform-container').width();
+            const startPercent = (startTime / audioDuration) * 100;
+            const endPercent = (endTime / audioDuration) * 100;
+            const width = endPercent - startPercent;
+            
+            // Update selection highlight
+            $('#selection-highlight').css({
+                'left': startPercent + '%',
+                'width': width + '%'
+            });
+            
+            // Update selection markers
+            $('#selection-start-marker').css('left', startPercent + '%');
+            $('#selection-end-marker').css('left', endPercent + '%');
+            
+            // Update labels
+            $('#start-label').css('left', startPercent + '%').text(formatTime(startTime));
+            $('#end-label').css('left', endPercent + '%').text(formatTime(endTime));
+        }
+        
+        // Update cursor position
+        function updateCursorPosition(seconds) {
+            if (!audioLoaded || !audioDuration) return;
+            
+            currentCursorPosition = seconds;
+            const percent = (seconds / audioDuration) * 100;
+            
+            $('#cursor-position').css('left', percent + '%');
+            $('#cursor-label').css('left', percent + '%').text(formatTime(seconds));
+        }
+        
+        // Update play/pause buttons
+        function updatePlayPauseButtons() {
+            if (isPlaying) {
+                $('#play-selection').html('<i class="fas fa-play me-2"></i>Play Selection');
+                $('#pause-playback').prop('disabled', false);
+            } else {
+                $('#play-selection').html('<i class="fas fa-play me-2"></i>Play Selection');
+                $('#pause-playback').prop('disabled', true);
+            }
+        }
+        
+        // Load audio from YouTube Music link
+        function loadYouTubeMusicAudio() {
+            const ytmusicLink = $('#ytmusic-link').val();
+            
+            if (ytmusicLink) {
+                // Fetch video information
+                $.ajax({
+                    url: '/api/track_info',
+                    type: 'GET',
+                    data: { link: ytmusicLink },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update track info
+                            updateTrackInfo(response.track_info);
+                            
+                            // Set audio source
+                            audioSource = response.audio_url;
+                            wavesurfer.load(audioSource);
+                        } else {
+                            alert('Error loading track information: ' + response.error);
+                        }
+                    },
+                    error: function(xhr) {
+                        alert('Error loading track information. Please try again.');
+                    }
+                });
+            }
+        }
+        
+        // Update track info display
+        function updateTrackInfo(trackInfo) {
+            let html = '';
+            
+            if (trackInfo.thumbnail) {
+                html += `<img src="${trackInfo.thumbnail}" class="track-image" alt="${trackInfo.title}">`;
+            } else {
+                html += `
+                <div class="track-image bg-secondary d-flex align-items-center justify-content-center">
+                    <i class="fas fa-music text-white fa-2x"></i>
+                </div>`;
+            }
+            
+            html += `
+            <div class="track-details">
+                <h3>${trackInfo.title}</h3>
+                <p>${trackInfo.artist}</p>
+                <p>${trackInfo.album || ''}</p>
+            </div>`;
+            
+            $('#track-info-container').html(html);
+        }
+        
+        // Validate selection duration
+        function validateSelection(duration) {
+            const minDuration = 5; // 5 seconds
+            const maxDuration = 30; // 30 seconds
+            
+            if (duration < minDuration) {
+                $('#selection-duration').addClass('text-danger');
+                $('#continue-btn').prop('disabled', true);
+                $('#selection-duration').parent().find('.invalid-feedback').remove();
+                $('#selection-duration').parent().append(`<div class="invalid-feedback d-block">Selection too short (minimum ${minDuration} seconds)</div>`);
+            } else if (duration > maxDuration) {
+                $('#selection-duration').addClass('text-danger');
+                $('#continue-btn').prop('disabled', true);
+                $('#selection-duration').parent().find('.invalid-feedback').remove();
+                $('#selection-duration').parent().append(`<div class="invalid-feedback d-block">Selection too long (maximum ${maxDuration} seconds)</div>`);
+            } else {
+                $('#selection-duration').removeClass('text-danger');
+                $('#continue-btn').prop('disabled', false);
+                $('#selection-duration').parent().find('.invalid-feedback').remove();
+            }
+        }
+        
+        // Play selected region
+        $('#play-selection').click(function() {
+            if (!audioLoaded) return;
+            
+            if (isPlaying) {
+                wavesurfer.pause();
+                isPlaying = false;
+            } else {
+                // If cursor is outside selection, move to start
+                if (currentCursorPosition < selectionStart || currentCursorPosition > selectionEnd) {
+                    wavesurfer.seekTo(selectionStart / audioDuration);
+                }
+                
+                // Play from current position
+                wavesurfer.play();
+                isPlaying = true;
+                
+                // Set up region playing logic
+                const checkPosition = setInterval(function() {
+                    if (!isPlaying) {
+                        clearInterval(checkPosition);
+                        return;
+                    }
+                    
+                    const currentTime = wavesurfer.getCurrentTime();
+                    
+                    // If reached end of selection, go back to start of selection
+                    if (currentTime >= selectionEnd) {
+                        wavesurfer.seekTo(selectionStart / audioDuration);
+                    }
+                }, 100);
+            }
+            
+            updatePlayPauseButtons();
+        });
+        
+        // Pause playback
+        $('#pause-playback').click(function() {
+            if (!audioLoaded) return;
+            
+            wavesurfer.pause();
+            isPlaying = false;
+            updatePlayPauseButtons();
+        });
+        
+        // Replay selection from beginning
+        $('#replay-selection').click(function() {
+            if (!audioLoaded) return;
+            
+            wavesurfer.seekTo(selectionStart / audioDuration);
+            wavesurfer.play();
+            isPlaying = true;
+            updatePlayPauseButtons();
+        });
+        
+        // Reset selection
+        $('#reset-btn').click(function() {
+            if (!audioLoaded) return;
+            
+            const slider = document.getElementById('time-slider');
+            slider.noUiSlider.set([0, audioDuration]);
+        });
+        
+        // Continue to next step
+        $('#continue-btn').click(function() {
+            if (!audioLoaded) return;
+            
+            const startTime = selectionStart;
+            const endTime = selectionEnd;
+            
+            // Validate selection duration
+            const duration = endTime - startTime;
+            if (duration < 5 || duration > 30) {
+                alert('Please select a segment between 5 and 30 seconds.');
+                return;
+            }
+            
+            // Show progress
+            $('#progress-container').removeClass('d-none');
+            $('#progress-bar').css('width', '0%');
+            $('#continue-btn').prop('disabled', true);
+            
+            // Animate progress bar
+            let progress = 0;
+            const progressInterval = setInterval(function() {
+                progress += 5;
+                $('#progress-bar').css('width', progress + '%');
+                $('#progress-bar').attr('aria-valuenow', progress);
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                }
+            }, 500);
+            
+            // Submit selection to server
+            $.ajax({
+                url: '/process_favorite',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_time: startTime,
+                    end_time: endTime
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        clearInterval(progressInterval);
+                        $('#progress-bar').css('width', '100%');
+                        
+                        // Check for next_step in the response
+                        if (response.next_step === 'processing') {
+                            // Redirect to processing page
+                            window.location.href = '/processing';
+                        } else {
+                            // Fallback to result page if next_step is not defined
+                            window.location.href = '/result';
+                        }
+                    } else {
+                        alert('Error: ' + response.error);
+                        $('#continue-btn').prop('disabled', false);
+                        $('#progress-container').addClass('d-none');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred during processing.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    alert('Error: ' + errorMsg);
+                    $('#continue-btn').prop('disabled', false);
+                    $('#progress-container').addClass('d-none');
+                }
+            });
+        });
+        
+        // Initialize
+        console.log('Document ready');
+        initWaveSurfer();
+    });
+</script>
+{% endblock %}

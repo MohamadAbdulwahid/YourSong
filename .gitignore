@@ -1,0 +1,25 @@
+# Secrets and local authentication
+.env
+.env.*
+!.env.example
+headers_auth.json
+oauth.json
+browser.json
+cookies*.txt
+
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Uploaded and generated audio
+uploads/
+segments/
+static/output/
+
+# Local editor and OS files
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,727 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<style>
+    .progress-container {
+        margin: 30px 0;
+    }
+    
+    .progress {
+        height: 20px;
+        margin-bottom: 15px;
+    }
+    
+    .processing-stage {
+        transition: opacity 0.3s ease;
+    }
+    
+    .processing-stage.inactive {
+        opacity: 0.4;
+    }
+    
+    .processing-stage.active {
+        opacity: 1;
+        animation: highlight-pulse 2s infinite;
+    }
+    
+    .processing-stage.completed {
+        opacity: 1;
+    }
+    
+    .track-container {
+        max-height: 420px;
+        overflow-y: auto;
+    }
+    
+    .related-track {
+        margin-bottom: 15px;
+        position: relative;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .related-track.analyzed {
+        border-left: 4px solid #ffc107; /* Changed from green to yellow for analyzed tracks */
+    }
+    
+    .related-track.matched {
+        border-left: 4px solid #198754; /* Green for successfully matched tracks */
+    }
+    
+    .related-track.processing {
+        border-left: 4px solid #dc3545; /* Red for processing/failed tracks */
+        animation: pulse 1s infinite;
+    }
+    
+    .match-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 2;
+    }
+    
+    .track-thumbnail {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    
+    .completion-actions {
+        display: none;
+    }
+    
+    .stage-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+    
+    @keyframes highlight-pulse {
+        0% { background-color: rgba(13, 110, 253, 0); }
+        50% { background-color: rgba(13, 110, 253, 0.1); }
+        100% { background-color: rgba(13, 110, 253, 0); }
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    
+    .similar-part {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+        transition: transform 0.2s ease;
+    }
+    
+    .similar-part:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .similar-parts-container {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 10px;
+    }
+    
+    .ai-analysis-log {
+        max-height: 150px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.85rem;
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+        margin-top: 10px;
+    }
+    
+    .log-entry {
+        margin-bottom: 5px;
+        padding: 3px 0;
+        border-bottom: 1px dotted #e9ecef;
+    }
+    
+    .log-entry.highlight {
+        background-color: #e9ecef;
+    }
+    
+    .track-similar-parts {
+        background-color: #e9ecef;
+        padding: 8px;
+        margin-top: 5px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('select_favorite') }}">Select Favorite Part</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Processing</li>
+            </ol>
+        </nav>
+        <h2 class="mb-4">Creating Your Personalized Track</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h3 class="card-title mb-3">Processing Status</h3>
+                
+                <div class="progress-container">
+                    <div class="progress">
+                        <div id="main-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div id="status-message" class="text-center mb-3">Initializing processing...</div>
+                </div>
+                
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div id="stage1" class="processing-stage inactive">
+                            <div class="stage-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <h5>Finding Related Tracks</h5>
+                            <p class="text-muted">Discovering music with similar style and mood</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="stage2" class="processing-stage inactive">
+                            <div class="stage-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <h5>AI Analysis</h5>
+                            <p class="text-muted">Using Gemini AI to identify similar musical patterns</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="stage3" class="processing-stage inactive">
+                            <div class="stage-icon">
+                                <i class="fas fa-music"></i>
+                            </div>
+                            <h5>Creating Your Track</h5>
+                            <p class="text-muted">Building seamless transitions between similar parts</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="completion-message" class="alert alert-success mt-4 text-center d-none">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <span>Your personalized track has been created successfully!</span>
+                </div>
+                
+                <div id="error-message" class="alert alert-danger mt-4 text-center d-none">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <span>An error occurred during processing.</span>
+                </div>
+                
+                <div class="completion-actions text-center mt-4">
+                    <a id="view-result-btn" href="" class="btn btn-primary btn-lg">
+                        <i class="fas fa-headphones me-2"></i>Listen to Your Track
+                    </a>
+                </div>
+                
+                <!-- AI Analysis log section -->
+                <div id="ai-analysis-section" class="mt-4 d-none">
+                    <h5><i class="fas fa-terminal me-2"></i>AI Analysis Log</h5>
+                    <div id="ai-analysis-log" class="ai-analysis-log">
+                        <div class="log-entry">Starting AI analysis...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="similar-parts-card" class="card shadow mb-4 d-none">
+            <div class="card-header">
+                <h5 class="mb-0">Similar Parts Found</h5>
+            </div>
+            <div class="card-body">
+                <p>These are the musical segments that match your selected favorite part:</p>
+                <div id="similar-parts-container" class="similar-parts-container">
+                    <!-- Similar parts will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Track Information</h5>
+            </div>
+            <div class="card-body">
+                {% if song_info %}
+                <div class="d-flex align-items-center mb-3">
+                    {% if song_info.cover_art %}
+                    <img src="{{ song_info.cover_art }}" class="me-3" alt="{{ song_info.title }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">
+                    {% else %}
+                    <div class="me-3 d-flex align-items-center justify-content-center bg-secondary" style="width: 80px; height: 80px; border-radius: 4px;">
+                        <i class="fas fa-music text-white fa-2x"></i>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <h5 class="mb-0">{{ song_info.title }}</h5>
+                        <p class="mb-0 text-muted">{{ song_info.artist }}</p>
+                        <p class="mb-0 text-muted">{{ song_info.album }}</p>
+                    </div>
+                </div>
+                {% elif audio_file %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3 d-flex align-items-center justify-content-center bg-secondary" style="width: 80px; height: 80px; border-radius: 4px;">
+                        <i class="fas fa-music text-white fa-2x"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0">{{ audio_file }}</h5>
+                        <p class="mb-0 text-muted">Uploaded audio file</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3 d-flex align-items-center justify-content-center bg-secondary" style="width: 80px; height: 80px; border-radius: 4px;">
+                        <i class="fas fa-music text-white fa-2x"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0">Processing Your Music</h5>
+                        <p class="mb-0 text-muted">From YouTube Music link</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <label class="form-label">Your Selected Part</label>
+                    <div id="favorite-part" class="form-control bg-light">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Related Tracks</h5>
+            </div>
+            <div class="card-body">
+                <p>Tracks with similar style and musical characteristics:</p>
+                <div id="related-tracks-container" class="track-container">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Searching for related tracks...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        const processId = "{{ process_id }}";
+        let processCompleted = false;
+        let currentStatus = '';
+        let processedTracks = {}; // Keep track of processed tracks
+        
+        // Initial call to get status
+        updateProcessStatus();
+        
+        // Set up polling for status updates
+        const statusInterval = setInterval(updateProcessStatus, 2000);
+        
+        // Function to update process status
+        function updateProcessStatus() {
+            $.ajax({
+                url: `/api/process_status/${processId}`,
+                type: 'GET',
+                success: function(data) {
+                    if (processCompleted) return;
+                    
+                    // Store the latest data for reference across functions
+                    window.latestData = data;
+                    
+                    // Update progress bar
+                    $('#main-progress').css('width', data.progress + '%');
+                    $('#main-progress').attr('aria-valuenow', data.progress);
+                    
+                    // Update status message
+                    $('#status-message').text(data.message);
+                    
+                    // Update favorite part info if available
+                    if (data.favorite_part) {
+                        const startTime = formatTime(data.favorite_part.start_time);
+                        const endTime = formatTime(data.favorite_part.end_time);
+                        $('#favorite-part').text(`${startTime} - ${endTime}`);
+                    }
+                    
+                    // Update processing stages
+                    updateProcessingStages(data.status);
+                    
+                    // Display related tracks if available
+                    if (data.related_tracks && data.related_tracks.length > 0) {
+                        displayRelatedTracks(data.related_tracks, data.similar_parts || []);
+                    }
+                    
+                    // Always show AI analysis log after finding_related is done
+                    if (data.status !== 'starting' && data.status !== 'finding_related') {
+                        $('#ai-analysis-section').removeClass('d-none');
+                    }
+                    
+                    // Update the log with details about which track is being processed
+                    if (data.current_track_analysis) {
+                        logAIAnalysis(data.current_track_analysis);
+                    }
+                    
+                    // Log track creation progress if available
+                    if (data.status === 'creating_track' && data.track_creation_info) {
+                        // Show track creation progress info
+                        logTrackCreation(data);
+                        
+                        // Update stage heading with progress if we have similar parts
+                        if (data.similar_parts && data.similar_parts.length > 0) {
+                            $('#stage3').find('h5').html(`Creating Your Track <small>(${Math.round(data.progress - 70)}%)</small>`);
+                        }
+                    }
+                    
+                    // Display similar parts if available
+                    if (data.similar_parts && data.similar_parts.length > 0) {
+                        displaySimilarParts(data.similar_parts);
+                        
+                        // Also update track UI to show which tracks have similar parts
+                        updateTracksWithSimilarParts(data.similar_parts);
+                    }
+                    
+                    // Handle completion
+                    if (data.status === 'completed') {
+                        processCompleted = true;
+                        clearInterval(statusInterval);
+                        
+                        // Show completion message
+                        $('#completion-message').removeClass('d-none');
+                        
+                        // Enable completion actions
+                        $('.completion-actions').show();
+                        
+                        // Set result URL
+                        $('#view-result-btn').attr('href', `/result?output_path=${data.output_path}`);
+                        
+                        // Stop animation on progress bar
+                        $('#main-progress').removeClass('progress-bar-animated');
+                        
+                        // Add final log entry
+                        logAIAnalysis({
+                            message: "Analysis complete! Created your personalized track with " + 
+                                    (data.similar_parts ? data.similar_parts.length : 0) + 
+                                    " similar musical segments."
+                        });
+                    }
+                    
+                    // Handle errors
+                    if (data.status === 'error') {
+                        clearInterval(statusInterval);
+                        $('#error-message').removeClass('d-none');
+                        $('#error-message span').text('Error: ' + data.error);
+                        $('#main-progress').removeClass('progress-bar-animated');
+                        $('#main-progress').addClass('bg-danger');
+                    }
+                    
+                    // Store current status
+                    currentStatus = data.status;
+                },
+                error: function() {
+                    // Handle error
+                    $('#status-message').text('Error communicating with server. Retrying...');
+                }
+            });
+        }
+        
+        // Function to log track creation progress
+        function logTrackCreation(data) {
+            if (!data.track_creation_info) return;
+            
+            const log = $('#ai-analysis-log');
+            
+            // Process new track creation info
+            if (Array.isArray(data.track_creation_info)) {
+                // Check if we need to add section header
+                if (!$('#track-creation-header').length) {
+                    log.append('<div id="track-creation-header" class="log-entry highlight"><strong>Track Creation Progress:</strong></div>');
+                }
+                
+                // Add new entries that we haven't seen yet
+                data.track_creation_info.forEach((message, index) => {
+                    const entryId = `track-creation-${index}`;
+                    
+                    // Only add if this entry doesn't exist yet
+                    if (!$(`#${entryId}`).length) {
+                        // Format special messages for better display
+                        let formattedMessage = message;
+                        
+                        // If it's about a segment or crossfade, format it nicely
+                        if (message.includes('Extracted segment from')) {
+                            formattedMessage = '→ ' + message;
+                        } else if (message.includes('Applying')) {
+                            formattedMessage = '→ ' + message;
+                        } else if (message.includes('Created track with')) {
+                            formattedMessage = '✓ ' + message;
+                        }
+                        
+                        const logEntry = $(`<div id="${entryId}" class="log-entry">${formattedMessage}</div>`);
+                        log.append(logEntry);
+                    }
+                });
+                
+                // Scroll to bottom
+                log.scrollTop(log[0].scrollHeight);
+            }
+        }
+        
+        // Function to log AI analysis progress
+        function logAIAnalysis(analysisData) {
+            if (!analysisData) return;
+            
+            const log = $('#ai-analysis-log');
+            
+            if (analysisData.track) {
+                // Track analysis entry
+                const trackId = analysisData.track.url || analysisData.track.title;
+                
+                // Only add new log entry if we haven't processed this track yet
+                if (!processedTracks[trackId]) {
+                    processedTracks[trackId] = true;
+                    
+                    // Calculate progress if we have related tracks
+                    let progressInfo = '';
+                    if (window.latestData && window.latestData.related_tracks) {
+                        const totalTracks = window.latestData.related_tracks.length;
+                        const currentIndex = window.latestData.related_tracks.findIndex(t => 
+                            t.url === analysisData.track.url) + 1;
+                        
+                        if (currentIndex > 0) {
+                            progressInfo = ` (${currentIndex}/${totalTracks})`;
+                        }
+                    }
+                    
+                    const logEntry = $(`<div class="log-entry highlight">
+                        Analyzing "${analysisData.track.title}" by ${analysisData.track.artist}${progressInfo}...
+                    </div>`);
+                    
+                    log.append(logEntry);
+                }
+                
+                // If there are similar parts detected, add them to the log
+                if (analysisData.similar_parts && analysisData.similar_parts.length > 0) {
+                    const partsEntry = $(`<div class="log-entry">
+                        Found ${analysisData.similar_parts.length} similar parts in "${analysisData.track.title}"
+                    </div>`);
+                    
+                    log.append(partsEntry);
+                    
+                    // Add details about each part
+                    analysisData.similar_parts.forEach(part => {
+                        const partDetails = $(`<div class="log-entry">
+                            → Similar part from ${formatTime(part.start_time)} to ${formatTime(part.end_time)} 
+                            (${Math.round(part.similarity_score * 100)}% match)
+                        </div>`);
+                        
+                        log.append(partDetails);
+                    });
+                }
+            } else if (analysisData.message) {
+                // Simple message log
+                const logEntry = $(`<div class="log-entry">${analysisData.message}</div>`);
+                log.append(logEntry);
+            }
+            
+            // Scroll to bottom
+            log.scrollTop(log[0].scrollHeight);
+        }
+        
+        // Function to update tracks with information about similar parts
+        function updateTracksWithSimilarParts(similarParts) {
+            // Group similar parts by track
+            const trackParts = {};
+            
+            similarParts.forEach(part => {
+                if (part.track && part.track.url) {
+                    if (!trackParts[part.track.url]) {
+                        trackParts[part.track.url] = [];
+                    }
+                    trackParts[part.track.url].push(part);
+                }
+            });
+            
+            // Find all track elements and update them
+            $('.related-track').each(function() {
+                const trackElement = $(this);
+                const trackUrl = trackElement.data('url');
+                
+                if (trackUrl && trackParts[trackUrl]) {
+                    // This track has similar parts
+                    const parts = trackParts[trackUrl];
+                    
+                    // If we haven't added the similar parts section yet
+                    if (trackElement.find('.track-similar-parts').length === 0) {
+                        // Add similar parts info
+                        const partsInfo = $('<div class="track-similar-parts"></div>');
+                        
+                        parts.forEach(part => {
+                            partsInfo.append(`<div>Similar part: ${formatTime(part.start_time)} - ${formatTime(part.end_time)} (${Math.round(part.similarity_score * 100)}% match)</div>`);
+                        });
+                        
+                        trackElement.find('.card-body').append(partsInfo);
+                    }
+                }
+            });
+        }
+        
+        // Function to update processing stages
+        function updateProcessingStages(status) {
+            // Reset all stages
+            $('.processing-stage').removeClass('active completed');
+            $('.processing-stage').addClass('inactive');
+            
+            // Update stages based on status
+            if (status === 'starting') {
+                $('#stage1').addClass('active').removeClass('inactive');
+            } else if (status === 'finding_related') {
+                $('#stage1').addClass('active').removeClass('inactive');
+            } else if (status === 'finding_similar') {
+                $('#stage1').addClass('completed').removeClass('inactive active');
+                $('#stage2').addClass('active').removeClass('inactive');
+            } else if (status === 'creating_track') {
+                $('#stage1').addClass('completed').removeClass('inactive active');
+                $('#stage2').addClass('completed').removeClass('inactive active');
+                $('#stage3').addClass('active').removeClass('inactive');
+            } else if (status === 'completed') {
+                $('#stage1').addClass('completed').removeClass('inactive active');
+                $('#stage2').addClass('completed').removeClass('inactive active');
+                $('#stage3').addClass('completed').removeClass('inactive active');
+            }
+        }
+        
+        // Function to display related tracks
+        function displayRelatedTracks(tracks, similarParts) {
+            // Clear existing content
+            $('#related-tracks-container').empty();
+            
+            // Create a map of tracks with similar parts
+            const matchedTracks = {};
+            similarParts.forEach(part => {
+                if (part.track && part.track.url) {
+                    matchedTracks[part.track.url] = true;
+                }
+            });
+            
+            // Get the currently processing track if any
+            let currentTrackAnalysis = null;
+            if (window.latestData && window.latestData.current_track_analysis) {
+                currentTrackAnalysis = window.latestData.current_track_analysis;
+            }
+            
+            const currentTrackUrl = currentTrackAnalysis && currentTrackAnalysis.track ? currentTrackAnalysis.track.url : null;
+            
+            // Add a counter for processed tracks
+            if (currentStatus === 'finding_similar' && currentTrackAnalysis) {
+                const totalTracks = tracks.length;
+                const currentIndex = tracks.findIndex(t => t.url === currentTrackUrl) + 1;
+                if (currentIndex > 0) {
+                    // Show progress in stage heading
+                    $('#stage2').find('h5').html(`AI Analysis <small>(${currentIndex}/${totalTracks})</small>`);
+                }
+            }
+            
+            // Display tracks
+            tracks.forEach((track, index) => {
+                const isMatched = matchedTracks[track.url] || false;
+                // Only mark as processing if this is the exact track being analyzed now
+                const isProcessing = currentStatus === 'finding_similar' && currentTrackUrl === track.url;
+                
+                let statusClass = '';
+                let badge = '';
+                
+                if (isMatched) {
+                    statusClass = 'matched'; // Green for matched tracks
+                    badge = '<span class="badge bg-success match-badge">Match found</span>';
+                } else if (isProcessing) {
+                    statusClass = 'processing'; // Red for processing tracks
+                } else if (currentStatus === 'finding_similar' || currentStatus === 'creating_track' || currentStatus === 'completed') {
+                    statusClass = 'analyzed'; // Yellow for analyzed tracks with no match
+                }
+                
+                // Fix thumbnail URL - ensure it's a valid image URL
+                let thumbnailUrl = '';
+                
+                // First make sure track.thumbnail is not undefined/null and is a valid URL
+                if (track.thumbnail && (track.thumbnail.startsWith('http') || track.thumbnail.startsWith('/static/'))) {
+                    thumbnailUrl = track.thumbnail;
+                } else if (track.video_id) {
+                    // If we have a YouTube video ID but no thumbnail, create YouTube thumbnail URL
+                    thumbnailUrl = `https://img.youtube.com/vi/${track.video_id}/mqdefault.jpg`;
+                }
+                
+                const htmlContent = $(`
+                <div class="card related-track ${statusClass}" data-url="${track.url}">
+                    ${badge}
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center">
+                            ${thumbnailUrl ? 
+                              `<img src="${thumbnailUrl}" class="track-thumbnail me-3" alt="${track.title}" onerror="this.onerror=null; this.src='/static/img/default-album.png'; this.classList.add('bg-secondary');">` : 
+                              `<div class="track-thumbnail me-3 d-flex align-items-center justify-content-center bg-secondary">
+                                <i class="fas fa-music text-white"></i>
+                               </div>`
+                            }
+                            <div>
+                                <h6 class="mb-0">${track.title}</h6>
+                                <p class="mb-0 text-muted small">${track.artist}</p>
+                                ${track.album ? `<p class="mb-0 text-muted small">${track.album}</p>` : ''}
+                                ${track.is_original ? '<span class="badge bg-success mt-1">Source Track</span>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `);
+                
+                $('#related-tracks-container').append(htmlContent);
+            });
+        }
+        
+        // Function to display similar parts
+        function displaySimilarParts(parts) {
+            // Show the card
+            $('#similar-parts-card').removeClass('d-none');
+            
+            // Clear existing content
+            $('#similar-parts-container').empty();
+            
+            // Display parts
+            parts.forEach(part => {
+                const htmlContent = `
+                <div class="similar-part">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            ${part.track.thumbnail ? 
+                              `<img src="${part.track.thumbnail}" alt="${part.track.title}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : 
+                              `<div style="width: 50px; height: 50px;" class="d-flex align-items-center justify-content-center bg-secondary rounded">
+                                <i class="fas fa-music text-white"></i>
+                               </div>`
+                            }
+                        </div>
+                        <div>
+                            <h6 class="mb-0">${part.track.title}</h6>
+                            <p class="mb-0 text-muted small">${part.track.artist}</p>
+                            <p class="mb-0 text-muted small">
+                                <span class="badge bg-light text-dark">${formatTime(part.start_time)} - ${formatTime(part.end_time)}</span>
+                                <span class="badge bg-primary">Similarity: ${Math.round(part.similarity_score * 100)}%</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                `;
+                
+                $('#similar-parts-container').append(htmlContent);
+            });
+            
+            // Show the container
+            $('#similar-parts-container').show();
+        }
+        
+        // Format time function
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+    });
+</script>
+{% endblock %}

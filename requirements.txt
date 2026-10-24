@@ -1,0 +1,13 @@
+Flask
+python-dotenv
+requests
+shazamio
+numpy
+scipy
+pydub
+yt-dlp
+google-genai
+ytmusicapi
+pymusiclooper
+aiohttp
+aiofiles

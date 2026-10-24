@@ -1,0 +1,439 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<style>
+    .track-player {
+        margin: 30px 0;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+    
+    .player-controls {
+        background-color: #0d6efd;
+        padding: 20px;
+        color: white;
+    }
+    
+    .waveform-container {
+        background-color: #f8f9fa;
+        height: 120px;
+        padding: 20px;
+        position: relative;
+    }
+    
+    .similar-part {
+        margin-bottom: 15px;
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+    
+    .similar-part:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .similar-part .card-body {
+        padding: 15px;
+    }
+    
+    .track-thumbnail {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    
+    .transition-line {
+        height: 30px;
+        border-left: 2px dashed #dee2e6;
+        margin: 0 auto;
+    }
+    
+    .action-buttons {
+        margin-top: 30px;
+    }
+    
+    .download-button {
+        margin-right: 10px;
+    }
+    
+    /* New timeline visualization styles */
+    .track-timeline {
+        position: relative;
+        height: 50px;
+        background-color: #e9ecef;
+        border-radius: 5px;
+        margin-top: 20px;
+        overflow: hidden;
+    }
+    
+    .timeline-segment {
+        position: absolute;
+        height: 100%;
+        top: 0;
+        border-right: 2px solid white;
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+    
+    .timeline-segment:hover, .timeline-segment.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.5);
+        z-index: 10;
+    }
+    
+    .timeline-segment-inner {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding: 0 10px;
+        position: relative;
+    }
+    
+    .segment-thumbnail {
+        width: 30px;
+        height: 30px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-right: 8px;
+        flex-shrink: 0;
+    }
+    
+    .segment-info {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.75rem;
+        color: white;
+        text-shadow: 0 0 3px rgba(0,0,0,0.8);
+        flex-grow: 1;
+    }
+    
+    .segment-position {
+        position: absolute;
+        bottom: 2px;
+        right: 5px;
+        font-size: 0.7rem;
+        background-color: rgba(0,0,0,0.5);
+        color: white;
+        padding: 1px 4px;
+        border-radius: 3px;
+    }
+    
+    .timeline-cursor {
+        position: absolute;
+        height: 100%;
+        width: 2px;
+        background-color: #dc3545;
+        top: 0;
+        left: 0;
+        z-index: 20;
+        pointer-events: none;
+    }
+    
+    .timeline-similarity-indicator {
+        position: absolute;
+        top: 0;
+        right: 3px;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(to bottom, #198754, #0dcaf0);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Your Custom Track</li>
+            </ol>
+        </nav>
+        <h2 class="mb-4">Your Personalized Track</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h3 class="mb-4">Listen to Your Track</h3>
+                
+                <div class="track-player">
+                    <div class="player-controls">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">Your Personalized Track</h5>
+                                <p class="mb-0 small">Created from your favorite musical patterns</p>
+                            </div>
+                            <div>
+                                <button id="play-btn" class="btn btn-light btn-sm">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button id="pause-btn" class="btn btn-light btn-sm d-none">
+                                    <i class="fas fa-pause"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="waveform-container">
+                        <div id="waveform"></div>
+                    </div>
+                    
+                    <!-- New Timeline visualization -->
+                    <div class="track-timeline" id="track-timeline">
+                        <div class="timeline-cursor" id="timeline-cursor"></div>
+                        <!-- Timeline segments will be added here via JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This track was created by finding musical patterns similar to your selected favorite part and combining them with seamless transitions.
+                </div>
+                
+                <div class="action-buttons text-center">
+                    <a href="{{ output_path }}" download class="btn btn-primary download-button">
+                        <i class="fas fa-download me-2"></i>Download Your Track
+                    </a>
+                    <a href="/" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo me-2"></i>Create Another
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">About Your Track</h5>
+            </div>
+            <div class="card-body">
+                <p>Your custom track has been created by analyzing your favorite musical segment and finding similar patterns in related songs.</p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Track Duration</label>
+                    <div id="track-duration" class="form-control bg-light">Calculating...</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Number of Segments</label>
+                    <div class="form-control bg-light">{{ segment_metadata|length if segment_metadata else similar_parts|length if similar_parts else 0 }}</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Created On</label>
+                    <div class="form-control bg-light">{{ now.strftime('%B %d, %Y at %H:%M') }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">How It Works</h5>
+            </div>
+            <div class="card-body">
+                <ol class="mb-0">
+                    <li class="mb-2">You selected your favorite part of a song</li>
+                    <li class="mb-2">We analyzed its musical characteristics using AI</li>
+                    <li class="mb-2">We found similar segments in related tracks</li>
+                    <li class="mb-2">We combined those segments with seamless transitions</li>
+                    <li>We created a unique track just for you!</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/6.6.3/wavesurfer.min.js"></script>
+<script>
+    $(document).ready(function() {
+        let wavesurfer;
+        let currentlyPlaying = null;
+        let trackSegments = {{ segment_metadata|tojson|safe if segment_metadata else '[]' }};
+        let totalDuration = 0;
+        let segmentColors = [
+            '#4285F4', '#EA4335', '#FBBC05', '#34A853', 
+            '#FF6D01', '#46BDC6', '#7248B9', '#DB4437',
+            '#673AB7', '#3F51B5', '#2196F3', '#03A9F4',
+            '#00BCD4', '#009688', '#4CAF50', '#8BC34A'
+        ];
+        
+        // Initialize WaveSurfer
+        function initWaveSurfer() {
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#6c757d',
+                progressColor: '#0d6efd',
+                cursorColor: '#dc3545',
+                barWidth: 2,
+                barGap: 1,
+                height: 80,
+                responsive: true,
+                normalize: true,
+                backend: 'MediaElement'
+            });
+            
+            // Load the audio file
+            wavesurfer.load('{{ output_path }}');
+            
+            // When audio is ready
+            wavesurfer.on('ready', function() {
+                // Enable play button
+                $('#play-btn').prop('disabled', false);
+                
+                // Update duration
+                totalDuration = wavesurfer.getDuration();
+                const minutes = Math.floor(totalDuration / 60);
+                const seconds = Math.floor(totalDuration % 60);
+                $('#track-duration').text(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+                
+                // Initialize timeline segments
+                initTimelineSegments();
+            });
+            
+            // When playback position changes
+            wavesurfer.on('audioprocess', function() {
+                const currentTime = wavesurfer.getCurrentTime();
+                updateTimelineCursor(currentTime);
+                highlightCurrentSegment(currentTime);
+            });
+            
+            // When playback ends
+            wavesurfer.on('finish', function() {
+                $('#play-btn').removeClass('d-none');
+                $('#pause-btn').addClass('d-none');
+            });
+            
+            // Handle errors
+            wavesurfer.on('error', function(err) {
+                console.error('WaveSurfer error:', err);
+                alert('Error loading audio. Please try again.');
+            });
+        }
+        
+        // Initialize timeline segments
+        function initTimelineSegments() {
+            const timeline = $('#track-timeline');
+            
+            // If we have segment metadata, use it
+            if (trackSegments && trackSegments.length > 0) {
+                // Clear any existing segments
+                timeline.find('.timeline-segment').remove();
+                
+                trackSegments.forEach((segment, index) => {
+                    // Calculate position and width
+                    const startPercent = (segment.start_position / totalDuration) * 100;
+                    const width = ((segment.end_position - segment.start_position) / totalDuration) * 100;
+                    const color = segmentColors[index % segmentColors.length];
+                    
+                    // Create segment element
+                    const segmentElement = $(`
+                        <div class="timeline-segment" 
+                             id="timeline-segment-${index}" 
+                             style="left: ${startPercent}%; width: ${width}%; background-color: ${color};"
+                             data-start="${segment.start_position}"
+                             data-end="${segment.end_position}">
+                            <div class="timeline-segment-inner">
+                                ${segment.thumbnail ? 
+                                  `<img src="${segment.thumbnail}" class="segment-thumbnail" alt="">` :
+                                  `<div class="segment-thumbnail bg-secondary d-flex align-items-center justify-content-center">
+                                     <i class="fas fa-music text-white" style="font-size: 12px;"></i>
+                                   </div>`
+                                }
+                                <div class="segment-info">
+                                    ${segment.title}
+                                </div>
+                                <div class="segment-position">
+                                    ${formatTime(segment.start_position)} - ${formatTime(segment.end_position)}
+                                </div>
+                                ${segment.similarity_score ? 
+                                  `<div class="timeline-similarity-indicator" style="opacity: ${segment.similarity_score};"></div>` : 
+                                  ''}
+                            </div>
+                        </div>
+                    `);
+                    
+                    // Add click event to jump to this segment
+                    segmentElement.click(function() {
+                        const startTime = $(this).data('start');
+                        wavesurfer.seekTo(startTime / totalDuration);
+                        
+                        // If not playing, start playback
+                        if ($('#play-btn').is(':visible')) {
+                            $('#play-btn').click();
+                        }
+                    });
+                    
+                    // Add to timeline
+                    timeline.append(segmentElement);
+                });
+            } else {
+                // If no segment metadata, create a generic timeline
+                timeline.append(`
+                    <div class="timeline-segment" style="width: 100%; background-color: #4285F4;">
+                        <div class="timeline-segment-inner">
+                            <div class="segment-info">Your Personalized Track</div>
+                        </div>
+                    </div>
+                `);
+            }
+        }
+        
+        // Update timeline cursor
+        function updateTimelineCursor(currentTime) {
+            const position = (currentTime / totalDuration) * 100;
+            $('#timeline-cursor').css('left', `${position}%`);
+        }
+        
+        // Highlight current segment
+        function highlightCurrentSegment(currentTime) {
+            // Remove active class from all segments
+            $('.timeline-segment').removeClass('active');
+            
+            // Find the current segment
+            if (trackSegments && trackSegments.length > 0) {
+                trackSegments.forEach((segment, index) => {
+                    if (currentTime >= segment.start_position && currentTime <= segment.end_position) {
+                        $(`#timeline-segment-${index}`).addClass('active');
+                        
+                        // If this isn't the currently playing segment, update
+                        if (currentlyPlaying !== index) {
+                            currentlyPlaying = index;
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Format time function
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Play button click
+        $('#play-btn').click(function() {
+            wavesurfer.play();
+            $(this).addClass('d-none');
+            $('#pause-btn').removeClass('d-none');
+        });
+        
+        // Pause button click
+        $('#pause-btn').click(function() {
+            wavesurfer.pause();
+            $(this).addClass('d-none');
+            $('#play-btn').removeClass('d-none');
+        });
+        
+        // Initialize
+        initWaveSurfer();
+    });
+</script>
+{% endblock %}

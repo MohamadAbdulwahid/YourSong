@@ -1,0 +1,266 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mt-5">
+    <div class="col-md-6">
+        <div class="hero-content">
+            <h1 class="display-4">YourSong</h1>
+            <p class="lead">Create personalized music tracks based on your favorite song parts.</p>
+            <p>Upload a song or provide a music link, select your favorite part, and we'll create a seamless personalized track for you.</p>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Get Started</h2>
+                
+                <ul class="nav nav-tabs mb-3" id="inputTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-tab-pane" type="button" role="tab">Upload Audio</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="link-tab" data-bs-toggle="tab" data-bs-target="#link-tab-pane" type="button" role="tab">Provide Link</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="inputTabsContent">
+                    <!-- File Upload Form -->
+                    <div class="tab-pane fade show active" id="upload-tab-pane" role="tabpanel" tabindex="0">
+                        <form id="uploadForm" class="needs-validation" novalidate>
+                            <div class="mb-3">
+                                <label for="audioFile" class="form-label">Upload an audio file</label>
+                                <input type="file" class="form-control" id="audioFile" name="audioFile" accept=".mp3,.wav,.ogg,.flac,.m4a" required>
+                                <div class="form-text">Supported formats: MP3, WAV, OGG, FLAC, M4A</div>
+                                <div class="invalid-feedback">Please select an audio file</div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" id="uploadBtn">
+                                    <i class="fas fa-upload me-2"></i>Upload & Analyze
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Link Form -->
+                    <div class="tab-pane fade" id="link-tab-pane" role="tabpanel" tabindex="0">
+                        <form id="linkForm" class="needs-validation" novalidate>
+                            <div class="mb-3">
+                                <label for="musicLink" class="form-label">Paste a music link</label>
+                                <input type="url" class="form-control" id="musicLink" name="musicLink" required
+                                    placeholder="YouTube, Spotify, Apple Music, etc." pattern="https?://.+">
+                                <div class="form-text">Works with YouTube, Spotify, Apple Music, and more</div>
+                                <div class="invalid-feedback">Please enter a valid URL</div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" id="linkBtn">
+                                    <i class="fas fa-link me-2"></i>Process Link
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status container -->
+        <div id="statusContainer" class="mt-3 d-none">
+            <div class="card">
+                <div class="card-body">
+                    <div id="loadingSpinner" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p id="statusMessage" class="mt-2">Processing your request...</p>
+                    </div>
+                    
+                    <div id="errorContainer" class="alert alert-danger d-none" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                    
+                    <div id="successContainer" class="alert alert-success d-none" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <span id="successMessage"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5" id="about">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">About YourSong</h2>
+                <p>YourSong is an innovative application that creates personalized music tracks based on your favorite parts of songs. Here's how it works:</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-upload fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="text-center">1. Upload or Link</h5>
+                        <p>Upload your audio file or provide a link to your favorite song from platforms like YouTube, Spotify, or Apple Music.</p>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-sliders-h fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="text-center">2. Select Favorite Part</h5>
+                        <p>Use our intuitive interface to select your favorite part of the song that you listen to the most.</p>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-magic fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="text-center">3. Get Your Custom Track</h5>
+                        <p>Our AI analyzes related songs and creates a seamless custom track with similar musical parts.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Form validation
+        const validateForm = function(form) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+                form.classList.add('was-validated');
+                return false;
+            }
+            return true;
+        };
+        
+        // Handle file upload form submission
+        $('#uploadForm').submit(function(event) {
+            event.preventDefault();
+            
+            if (!validateForm(this)) return;
+            
+            const formData = new FormData();
+            const fileInput = $('#audioFile')[0];
+            
+            if (fileInput.files.length === 0) {
+                showError('Please select a file to upload.');
+                return;
+            }
+            
+            formData.append('audioFile', fileInput.files[0]);
+            
+            // Show loading status
+            showLoading('Uploading and analyzing your song...');
+            
+            // Send AJAX request
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        showSuccess('Song identified successfully!');
+                        // Redirect to next step
+                        setTimeout(function() {
+                            window.location.href = '/select_favorite';
+                        }, 1500);
+                    } else {
+                        showError(response.error || 'An error occurred during processing.');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred during upload.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    showError(errorMsg);
+                }
+            });
+        });
+        
+        // Handle link form submission
+        $('#linkForm').submit(function(event) {
+            event.preventDefault();
+            
+            if (!validateForm(this)) return;
+            
+            const musicLink = $('#musicLink').val().trim();
+            
+            if (!musicLink) {
+                showError('Please enter a valid music link.');
+                return;
+            }
+            
+            // Show loading status
+            showLoading('Processing your music link...');
+            
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('musicLink', musicLink);
+            
+            // Send AJAX request
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        showSuccess('Link processed successfully!');
+                        // Redirect to next step
+                        setTimeout(function() {
+                            window.location.href = '/select_favorite';
+                        }, 1500);
+                    } else {
+                        showError(response.error || 'An error occurred during processing.');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred while processing the link.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    showError(errorMsg);
+                }
+            });
+        });
+        
+        // Status functions
+        function showLoading(message) {
+            $('#statusContainer').removeClass('d-none');
+            $('#loadingSpinner').removeClass('d-none');
+            $('#errorContainer').addClass('d-none');
+            $('#successContainer').addClass('d-none');
+            $('#statusMessage').text(message || 'Processing...');
+        }
+        
+        function showError(message) {
+            $('#statusContainer').removeClass('d-none');
+            $('#loadingSpinner').addClass('d-none');
+            $('#errorContainer').removeClass('d-none');
+            $('#successContainer').addClass('d-none');
+            $('#errorMessage').text(message);
+        }
+        
+        function showSuccess(message) {
+            $('#statusContainer').removeClass('d-none');
+            $('#loadingSpinner').addClass('d-none');
+            $('#errorContainer').addClass('d-none');
+            $('#successContainer').removeClass('d-none');
+            $('#successMessage').text(message);
+        }
+    });
+</script>
+{% endblock %}
